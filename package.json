@@ -1,0 +1,26 @@
+{
+  "name": "react-di-pattern",
+  "version": "0.1.0",
+  "license": "0BSD",
+  "dependencies": {
+    "@reduxjs/toolkit": "^1.9.3",
+    "@types/react": "^18.0.33",
+    "@types/react-dom": "^18.0.11",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-redux": "^8.0.5",
+    "react-scripts": "5.0.1",
+    "typescript": "^5.0.4"
+  },
+  "scripts": {
+    "start": "react-scripts start"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
+  "browserslist": [
+    "defaults"
+  ]
+}

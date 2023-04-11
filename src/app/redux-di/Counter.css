@@ -1,0 +1,13 @@
+.counter {
+  display: flex;
+  align-items: baseline;
+}
+
+.counter__label {
+  flex-basis: 12em;
+}
+
+.counter__buttons {
+  display: flex;
+  gap: 0.5em;
+}
