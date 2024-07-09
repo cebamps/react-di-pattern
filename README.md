@@ -12,12 +12,17 @@ Then, a change of requirements makes it so that F needs to exist in multiple par
 ## Example and scope
 
 The example in this repository illustrates the problem and its solution in a specific scope.
-Namely, feature F is connected to a Redux store, receives its inputs from it and produces its effects through dispatched actions.
+Namely, we start with a feature F that is connected to a Redux store: it subscribes to the store to obtain data, and produces state updates through dispatched actions.
 
-This is interesting, because that makes the feature coupled with the rest of our app in a special way.
-Unlike your regular component tree that exclusively communicates with its context through props at its root, here the coupling with the app permeates through the tree.
-If our feature F is large enough, refactoring to such a prop-driven component might be costly.
+This is interesting, because the Redux connection makes the feature coupled with the rest of our app in a special way.
+Unlike your regular component subtree that exclusively communicates with parent components through props at the root of the subtree, here the coupling with the Redux store permeates through the tree.
+In particular, we cannot take a copy of that subtree and graft it somewhere else and expect the two copies to be independent: they both connect to the same part of the store, and therefore share the same state.
+
+One way to remedy that is to refactor feature F to stop explicitly connecting to the Redux store, and use prop drilling instead to pass down the state values and update callbacks.
+But if our feature F is large enough, refactoring to such a prop-driven component could be costly.
 In the process, we might also miss out on [the performant re-rendering][react-redux-history] provided by React Redux.
+
+Instead, we will keep the Redux connection as-is, and take inspiration from dependency injection (DI) to parameterize it, construct two copies of feature F that connect to independent parts of the Redux store.
 
 In this repository, we keep things simple: our feature F is the classic counter component, connected to Redux state.
 
@@ -84,7 +89,7 @@ Now we can create as many versions of `Counter` as we need for our app, passing 
 
 I can't imagine this is such a rare pattern, but I have had trouble finding it elsewhere.
 
-The main author I can credit is [Madeline Trotter], in [purescript-react-basic-hooks], where you will find this exact same pattern, except that no dependency is passed.[^1]
+The main author I can credit is [Madeline Trotter], in [purescript-react-basic-hooks], where you will find this exact same pattern, except that no dependency is injected.[^1]
 
 [^1]:
     To be more precise: the `react-basic-hooks` equivalent to our `mkCounter` has an [`Effect (MyProps -> JSX)` type][react-basic-hooks-component-api], which would correspond to the TypeScript `() => React.FC<MyProps>` type.
@@ -120,30 +125,34 @@ Another candidate pattern to solve the same problem is to pass down dependencies
 The approach presented here has a few advantages, however:
 
 Because the injected dependencies are static, we can fearlessly inject React hooks without violating the rule of hooks.
-Indeed, once a hook is injected, it cannot be replaced with another one.
-On the other hand, with React context or props, there is no guarantee that the value will not change over time: props and context are designed to pass changing values.
-In that sense, passing a hook as a prop could be considered an anti-pattern.
+Indeed, a hook is injected once, when creating the component that uses it.
+The same component therefore always uses the same hook.
+On the other hand, if we imagine passing a hook through React context or props, there is no guarantee that the hook will not change over time. In fact the primary design intent of props and context is to pass values that can change from one render to the next.
+Therefore, passing a hook as a prop is a definite anti-pattern: [the React docs have a paragraph](https://react.dev/reference/rules/react-calls-components-and-hooks#never-pass-around-hooks-as-regular-values) cautioning to "never pass around Hooks as regular values".
 
 Moreover, compared to the React context API in particular, the consumer and provider of the DI context are explicitly linked.
 In contrast, React context providers and consumers are linked in a way that is dependent on the runtime component hierarchy, which makes this link looser and more inscrutable.
 
 Still comparing to React context, the proposed pattern also does not require us to define a default value for the DI context.
 
-Finally, we can generalize this pattern beyond React components: we can also use it to inject dependencies into utilities, Redux selectors and so on, which do not have direct access to React context.
+Finally, this pattern applies not only to React components, but also utilities, Redux selectors, or anything else that might depend on context.
+In contrast, React context may only be accessed directly by React components and custom hooks.
 
 Some downsides and limitations are:
 
 - This is a relatively unusual pattern, and a new concept to learn.
 
-- Different parents of the same child component will create their own versions of the child, which is also unusual.
+- Different parents of the same child component will create their own versions of the child, which can be counter-intuitive.
   In React, function components that are not equal by reference (that is, according to the `===` operator) are considered different for the purpose of tracking state (see "[Different components at the same position reset state](https://react.dev/learn/preserving-and-resetting-state#different-components-at-the-same-position-reset-state)").
-  With our DI pattern, every call to `mkButtons` create a new `Buttons` component that is different from the others.
+  With our DI pattern, every call to `mkButtons` creates a new `Buttons` component that is different from the others.
   This should be fine most of the time, but it is still something to be aware of.
 
 - The fact that context is injected once means we cannot inject values that change over time. In our example, injecting a Redux selector works, but injecting an actual state value would not.
+  This limitation can be considered a feature -- see the next point about hooks.
 
 - There is a bit of boilerplate.
-  However, this is not as bad as prop drilling: in this pattern, there is a clear separation between DI context and component props, whereas prop drilling tends to tangle the two concepts together into a single props type.
+  However, this is not as bad as prop drilling: with this DI pattern there is a clear separation between DI context and component props, both in lifecycle (the component is created at one time and mounted at another time) and in location (the context and props are clearly separated in code).
+  In contrast, prop drilling tends to tangle the two concepts together into a single props type, and every level of nesting would find us mixing context with regular props when rendering a child component, only to separate them again in the child's render function.
 
 ## What is this pattern anyway?
 
@@ -176,8 +185,9 @@ mkCounter = do
 
 ## Other references
 
-https://blog.logrocket.com/dependency-injection-react/  
-This LogRocket blog post proposes DI through props or context.
+This LogRocket blog post proposes DI through props or context: https://x.com/garybernhardt/status/1006983057138741248
+
+"A distressing amount of the history of programming is about ways to avoid passing the first argument around explicitly." -- [Gary Barnhardt](https://x.com/garybernhardt/status/1006983057138741248)
 
 ---
 
